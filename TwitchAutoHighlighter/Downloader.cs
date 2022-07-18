@@ -5,35 +5,36 @@ using System.Threading.Tasks;
 
 namespace TwitchAutoHighlighter
 {
-    public class Downloader
+    public static class Downloader
     {
-        private static int LastHighlightTime = 0;
-        public static void DownloadVideo(string id, int count, int startTime, int endTime)
+        private static decimal _lastHighlightTime = 0;
+        public static void DownloadVideo(string id, decimal count, decimal startTime, decimal endTime)
         {
-            if (endTime - LastHighlightTime < (endTime - startTime) * 2 && LastHighlightTime != 0)
+            if (endTime - _lastHighlightTime < (endTime - startTime) * 2 && _lastHighlightTime != 0)
             {
-                startTime = LastHighlightTime;
+                startTime = _lastHighlightTime;
             }
 
-            System.Diagnostics.Process process = new System.Diagnostics.Process();
-            System.Diagnostics.ProcessStartInfo startInfo = new System.Diagnostics.ProcessStartInfo();
-            //startInfo.WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden;
-            startInfo.FileName = "TwitchDownloaderCLI.exe";
-            startInfo.Arguments = $"-m VideoDownload --id {id} -o video{count}.mp4 -b {startTime} -e {endTime}";
-            process.StartInfo = startInfo;
+            var process = new Process
+            {
+                StartInfo = new ProcessStartInfo
+                {
+                FileName = "TwitchDownloaderCLI.exe",
+                Arguments = $"-m VideoDownload --id {id} -o video{count}.mp4 -b {Convert.ToInt32(startTime)} -e {Convert.ToInt32(endTime)}"
+            }};
             process.Start();
             process.WaitForExit();
-            LastHighlightTime = endTime;
+            _lastHighlightTime = endTime;
 
         }
         public static void DownloadChat(string id)
-        {
-            System.Diagnostics.Process process = new System.Diagnostics.Process();
-            System.Diagnostics.ProcessStartInfo startInfo = new System.Diagnostics.ProcessStartInfo();
-            //startInfo.WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden;
-            startInfo.FileName = "TwitchDownloaderCLI.exe";
-            startInfo.Arguments = $"-m ChatDownload --id {id} -o chat.json";
-            process.StartInfo = startInfo;
+        {            var startInfo = new ProcessStartInfo
+            {
+                FileName = "TwitchDownloaderCLI.exe",
+                Arguments = $"-m ChatDownload --id {id} -o chat.json"
+            };
+
+            var process = new Process(){StartInfo = startInfo};
             process.Start();
             process.WaitForExit();
         }

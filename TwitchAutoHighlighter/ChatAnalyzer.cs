@@ -10,57 +10,58 @@ namespace TwitchAutoHighlighter
 {
     public class ChatAnalyzer
     {
-        public List<Tuple<int, int>> Analyze(int count, int hSeconds)
+        public static string StreamerName;
+        public static string StreamStartDate;
+        private static int _messagesCount;
+        private static JObject _chatJson;
+
+        public ChatAnalyzer()
         {
-            using var file = File.OpenText(@"chat.json");
-            using var reader = new JsonTextReader(file);
-            var jToken = (JObject)JToken.ReadFrom(reader);
-            var createdAt = jToken["comments"].Children()["created_at"];
-            var second = jToken["comments"].Children()["content_offset_seconds"];
+            _chatJson = ConvertChatToJObject();
+            StreamerName = _chatJson["streamer"]?["name"]?.ToString();
+            StreamStartDate = Convert.ToDateTime(GetFromComments("created_at").First()).ToString("dd-MM-yyyy");
+            _messagesCount = GetFromComments("message").Count();
+        }
 
-            var dates = createdAt.Select(Convert.ToDateTime).ToList();
+        public static List<Clip> Analyze(int count, int hSeconds)
+        {
+            var dates = GetFromComments("created_at").Select(Convert.ToDateTime).ToList(); 
+            var seconds = GetFromComments("content_offset_seconds").Select(Convert.ToDecimal).ToList();
 
-            var seconds = second.Select(Convert.ToInt32).ToList();
-
-
-            var collectionOfAverageSpeed = new List<Tuple<int, int>>();
-            var x = 0;
+            var collectionOfAverageSpeed = new List<Clip>();
+            var previousClipLastMessageNumber = 0;
             var messageCount = 0;
-            var time = 0;
-            
-            
-            
-            for (var z = 0; z < dates.Count(); z++)
+
+            for (var currentClipLastMessageNumber = 0; currentClipLastMessageNumber < _messagesCount; currentClipLastMessageNumber++)
             {
                 messageCount += 1;
-                if (dates.ElementAt(z) > dates.ElementAt(x).AddSeconds(hSeconds))
+                if (dates.ElementAt(currentClipLastMessageNumber) > dates.ElementAt(previousClipLastMessageNumber).AddSeconds(hSeconds))
                 {
-                    x = z;
-                    time += hSeconds;
-                    collectionOfAverageSpeed.Add(new Tuple<int, int>(seconds[z], messageCount));
+                    previousClipLastMessageNumber = currentClipLastMessageNumber;
+                    collectionOfAverageSpeed.Add(new Clip{StartTime = seconds[currentClipLastMessageNumber], MessageCount = messageCount});
                     messageCount = 0;
-
                 }
-
-
             }
 
-            collectionOfAverageSpeed = collectionOfAverageSpeed.OrderByDescending(i => i.Item2).ToList();
-            collectionOfAverageSpeed = collectionOfAverageSpeed.Take(count).ToList();
-            var topHighlights = new List<Tuple<int, int>>();
+            return collectionOfAverageSpeed
+                .OrderByDescending(clip => clip.MessageCount)
+                .Take(count)
+                .Select(clip => new Clip {StartTime = clip.StartTime, MessageCount = clip.MessageCount})
+                .OrderBy(clip => clip.StartTime)
+                .ToList();
+        }
 
-            for (int i = 0; i < collectionOfAverageSpeed.Count; i++)
-            {
-                
-                
-                    topHighlights.Add(new Tuple<int, int>(collectionOfAverageSpeed[i].Item1, collectionOfAverageSpeed[i].Item2));
-                
+        private static IEnumerable<JToken> GetFromComments(string childName)
+        {
+            return _chatJson["comments"]?.Children()[childName];
+        }
 
-
-            }
-
-            return topHighlights.OrderBy(i => i.Item1).ToList();
-
+        private static JObject ConvertChatToJObject()
+        {
+            const string chatJsonFileName = "chat.json";
+            using var file = File.OpenText(chatJsonFileName);
+            using var reader = new JsonTextReader(file);
+            return (JObject)JToken.ReadFrom(reader);
         }
     }
 }
